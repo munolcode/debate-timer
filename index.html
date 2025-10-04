@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,12 +44,38 @@
     align-items: center;
     background: rgba(255,255,255,0.05);
     box-shadow: 0 0 20px rgba(56,189,248,0.3);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s;
+    position: relative;
   }
 
   .circle.small {
     width: 150px;
     height: 150px;
     border-width: 6px;
+  }
+
+  .circle:hover {
+    transform: scale(1.05);
+  }
+
+  .active {
+    animation: glow 1.2s infinite alternate;
+  }
+
+  @keyframes glow {
+    0% {
+      box-shadow: 0 0 20px rgba(56,189,248,0.5);
+      transform: scale(1.05);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(56,189,248,0.9);
+      transform: scale(1.08);
+    }
+    100% {
+      box-shadow: 0 0 30px rgba(56,189,248,0.7);
+      transform: scale(1.05);
+    }
   }
 
   .label {
@@ -63,26 +88,7 @@
     font-weight: bold;
   }
 
-  .controls {
-    margin-top: 30px;
-  }
-
-  .controls button {
-    font-size: 1em;
-    padding: 10px 20px;
-    margin: 6px;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    font-weight: 600;
-  }
-
-  #startBtn { background-color: #22c55e; color: white; }
-  #pauseBtn { background-color: #facc15; color: black; }
-  #nextBtn  { background-color: #ef4444; color: white; }
-
   .hidden { display: none; }
-
 </style>
 </head>
 <body>
@@ -124,87 +130,94 @@
       <div class="time" id="amAgainstTime">00:00</div>
     </div>
   </div>
-
-  <div class="controls">
-    <button id="startBtn">Start</button>
-    <button id="pauseBtn">Pause</button>
-    <button id="nextBtn">Next</button>
-  </div>
 </div>
 
 <script>
 const timers = [
-  { id: "resForTime", label: "Resolution – In Favour", minutes: 0 },
-  { id: "resAgainstTime", label: "Resolution – Against", minutes: 0 },
-  { id: "amForTime", label: "Amendment – In Favour", minutes: 0 },
-  { id: "amAgainstTime", label: "Amendment – Against", minutes: 0 }
+  { id: "resForTime", label: "Resolution – In Favour", minutes: 0, interval: null, running: false },
+  { id: "resAgainstTime", label: "Resolution – Against", minutes: 0, interval: null, running: false },
+  { id: "amForTime", label: "Amendment – In Favour", minutes: 0, interval: null, running: false },
+  { id: "amAgainstTime", label: "Amendment – Against", minutes: 0, interval: null, running: false }
 ];
-
-let current = 0;
-let remaining = 0;
-let running = false;
-let interval = null;
 
 function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-function updateDisplay() {
-  timers.forEach((t, i) => {
-    document.getElementById(t.id).textContent = (i === current)
-      ? formatTime(remaining)
-      : formatTime(t.minutes * 60);
+function updateDisplay(index) {
+  const t = timers[index];
+  document.getElementById(t.id).textContent = formatTime(t.remaining);
+}
+
+function stopAllTimers() {
+  timers.forEach(t => {
+    const circle = document.getElementById(t.id).parentElement;
+    circle.classList.remove("active");
+    if(t.interval){
+      clearInterval(t.interval);
+      t.interval = null;
+      t.running = false;
+    }
   });
 }
 
-function startTimer() {
-  if (running) return;
-  running = true;
-  interval = setInterval(() => {
-    if (remaining > 0) {
-      remaining--;
-      updateDisplay();
-    } else {
-      stopTimer();
-      alert("⏰ Time’s up for " + timers[current].label);
-    }
-  }, 1000);
-}
-
-function stopTimer() {
-  running = false;
-  clearInterval(interval);
-}
-
-function nextTimer() {
-  stopTimer();
-  if (current < timers.length - 1) {
-    current++;
-    remaining = timers[current].minutes * 60;
-    updateDisplay();
+function toggleTimer(index) {
+  const t = timers[index];
+  const circle = document.getElementById(t.id).parentElement;
+  if(t.remaining <= 0) return;
+  
+  if(t.running){
+    clearInterval(t.interval);
+    t.interval = null;
+    t.running = false;
+    circle.classList.remove("active");
   } else {
-    alert("🏁 Debate complete!");
+    stopAllTimers();
+    t.running = true;
+    circle.classList.add("active");
+    t.interval = setInterval(() => {
+      if(t.remaining > 0){
+        t.remaining--;
+        updateDisplay(index);
+      } else {
+        clearInterval(t.interval);
+        t.interval = null;
+        t.running = false;
+        circle.classList.remove("active");
+        updateDisplay(index);
+        alert(`⏰ Time's up for ${t.label}`);
+      }
+    }, 1000);
   }
 }
 
 document.getElementById("beginBtn").addEventListener("click", () => {
-  timers[0].minutes = parseInt(document.getElementById("resFor").value) || 0;
-  timers[1].minutes = parseInt(document.getElementById("resAgainst").value) || 0;
-  timers[2].minutes = parseInt(document.getElementById("amFor").value) || 0;
-  timers[3].minutes = parseInt(document.getElementById("amAgainst").value) || 0;
+  timers[0].minutes = parseInt(document.getElementById("resFor").value)||0;
+  timers[1].minutes = parseInt(document.getElementById("resAgainst").value)||0;
+  timers[2].minutes = parseInt(document.getElementById("amFor").value)||0;
+  timers[3].minutes = parseInt(document.getElementById("amAgainst").value)||0;
 
-  remaining = timers[0].minutes * 60;
+  timers.forEach(t => {
+    t.remaining = t.minutes*60;
+    t.interval = null;
+    t.running = false;
+    document.getElementById(t.id).textContent = formatTime(t.remaining);
+  });
+
   document.getElementById("setup").classList.add("hidden");
   document.getElementById("timerUI").classList.remove("hidden");
-  updateDisplay();
 });
 
-document.getElementById("startBtn").addEventListener("click", startTimer);
-document.getElementById("pauseBtn").addEventListener("click", stopTimer);
-document.getElementById("nextBtn").addEventListener("click", nextTimer);
+// Add click event to each circle
+timers.forEach((t, index) => {
+  const circle = document.getElementById(t.id).parentElement;
+  circle.addEventListener("click", () => toggleTimer(index));
+});
 </script>
 
 </body>
 </html>
+
+  
